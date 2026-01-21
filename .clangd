@@ -1,0 +1,6 @@
+CompileFlags:
+  Add:
+    - -x
+    - c
+    - -std=c99
+    - -I/opt/homebrew/Cellar/open-mpi/5.0.9/include
