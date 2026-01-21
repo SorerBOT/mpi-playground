@@ -1,11 +1,11 @@
-CC=gcc
+CC=mpicc
 
-main: prebuild ./bin/main.o
-	$(CC) ./bin/main.o -o ./bin/main $(LDFLAGS)
-	rm ./bin/main.o
+prefix_sum_sendrecv: prebuild ./bin/prefix_sum_sendrecv.o
+	$(CC) ./bin/prefix_sum_sendrecv.o -o ./bin/prefix_sum_sendrecv $(LDFLAGS)
+	rm ./bin/prefix_sum_sendrecv.o
 
-./bin/main.o:
-	$(CC) -c main.c $(CFLAGS) -o ./bin/main.o
+./bin/prefix_sum_sendrecv.o:
+	$(CC) -c prefix_sum_sendrecv.c $(CFLAGS) -o ./bin/prefix_sum_sendrecv.o
 
 prebuild:
 	mkdir -p ./bin
