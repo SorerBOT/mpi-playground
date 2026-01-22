@@ -2,6 +2,4 @@
 
 make || exit 1
 
-./bin/prefix_sum_sendrecv
-
-
+mpirun -n 4  ./bin/prefix_sum_sendrecv
