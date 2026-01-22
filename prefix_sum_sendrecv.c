@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <mpi.h>
 
-#define PG_MPI_COMM_LEADER 0
-#define PG_MPI_TAG_HELLO 0
+#define PG_MPI_RANK_MINIMUM 0
+#define PG_MPI_TAG_SUM 0
 
 
 
@@ -37,16 +37,27 @@ int main(int argc, char** argv)
 
     int comm_rank = -1;
     int comm_size = -1;
-    int error_code = 0;
 
-    error_code = MPI_Comm_rank(MPI_COMM_WORLD, &comm_rank);
+    MPI_Comm_rank(MPI_COMM_WORLD, &comm_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
 
+    int prefix_sum = -1;
+    if (comm_rank == PG_MPI_RANK_MINIMUM)
+    {
+        prefix_sum = comm_rank;
+    }
+    else
+    {
+        MPI_Recv(&prefix_sum, 1, MPI_INTEGER, comm_rank - 1, PG_MPI_TAG_SUM, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        prefix_sum += comm_rank;
+    }
 
-    error_code = MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
+    printf("rank=%d x=%d prefix=%d\n", comm_rank, comm_rank, prefix_sum);
 
-    error_code = MPI_Send(&comm_rank, 1,
-            MPI_INTEGER, PG_MPI_COMM_LEADER,
-            PG_MPI_TAG_HELLO, MPI_COMM_WORLD);
+    if (comm_rank < comm_size - 1)
+    {
+        MPI_Send(&prefix_sum, 1, MPI_INTEGER, comm_rank + 1, PG_MPI_TAG_SUM, MPI_COMM_WORLD);
+    }
 
     MPI_Finalize();
     return 0;
