@@ -47,15 +47,40 @@ char* get_argv(int* argc, char*** argv)
 }
 
 static int scalar_prod(const IMatrix* A, const IMatrix* B,
-        size_t A_row, size_t B_col, int N)
+        size_t A_row, size_t B_col)
 {
     int sum = 0;
-    for (int i = 0; i < N; ++i)
+    for (int i = 0; i < A->N; ++i)
     {
         sum += imatrix_get(A, A_row, i) * imatrix_get(B, i, B_col);
     }
 
     return sum;
+}
+
+static int matrix_compare(const IMatrix* A, const IMatrix* B)
+{
+    int N = A->N;
+    for (int i = 0; i < N * N; ++i)
+    {
+        if (A->data[i] != B->data[i])
+        {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static void matrix_mul(const IMatrix* A, const IMatrix* B, IMatrix* oC)
+{
+    for (int row = 0; row < oC->N; ++row)
+    {
+        for (int col = 0; col < oC->N; ++col)
+        {
+            oC->data[row * oC->N + col] = scalar_prod(A, B, row, col);
+        }
+    }
 }
 
 int main(int argc, char** argv)
@@ -168,7 +193,7 @@ int main(int argc, char** argv)
     {
         for (size_t B_col_current = 0; B_col_current < N; ++B_col_current)
         {
-            int product = scalar_prod(&A, &B, A_row_current, B_col_current, N);
+            int product = scalar_prod(&A, &B, A_row_current, B_col_current);
             imatrix_set(&C, A_row_current, B_col_current, product);
 #if PG_MM_DEBUG
             printf("C[%lu, %lu] = %d\n", A_row_current, B_col_current, product);
@@ -284,9 +309,27 @@ int main(int argc, char** argv)
 #if PG_MM_DEBUG
         printf("Printing matrix after update...\n");
         imatrix_print(&C, "C");
+        printf("Comparing against sequential algorithm...\n");
+
+        IMatrix D = imatrix_alloc(N);
+        if ( memcmp(&A, &matrix_null, sizeof(IMatrix)) == 0 )
+        {
+            fprintf(stderr, "PG_MM: imatrix_alloc() failed to allocate matrix.\n");
+            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+        }
+
+        matrix_mul(&A, &B, &D);
+        if ( matrix_compare(&C, &D) != 0 )
+        {
+            fprintf(stderr, "PG_MM: expected C == D.\n");
+            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+        }
+        else
+        {
+            printf("PG_MM: Comparison successful, matrices are equal.\n");
+        }
 #endif
     }
-
 
 
     if (comm_rank == PG_MM_LEADER_RANK)
