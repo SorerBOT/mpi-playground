@@ -30,37 +30,6 @@ void mpi_error_handler_callback(MPI_Comm* comm, int* error_code, ...)
     MPI_Abort(*comm, *error_code);
 }
 
-/*
- * In case the input size is not a power of 2, and that 2^k is the highest power of two still lower
- * than the input size, then I'll simply comute the prefix-sum of the first 2^k elements using the parallel algorithm, and the remaining elements sequentially.
- * There are other ways to do this, like simulating nodes with 0 rank, or by comple
-*/
-void prefix_sum_sequential(int initial_rank, int prefix_sum)
-{
-    int comm_rank = -1;
-    int comm_size = -1;
-
-    MPI_Comm_rank(MPI_COMM_WORLD, &comm_rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
-
-    if (comm_rank == PG_MPI_RANK_MINIMUM)
-    {
-        prefix_sum = comm_rank;
-    }
-    else
-    {
-        MPI_Recv(&prefix_sum, 1, MPI_INTEGER, comm_rank - 1, PG_MPI_TAG_SUM, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        prefix_sum += comm_rank;
-    }
-
-    printf("rank=%d x=%d prefix=%d\n", comm_rank, comm_rank, prefix_sum);
-
-    if (comm_rank < comm_size - 1)
-    {
-        MPI_Send(&prefix_sum, 1, MPI_INTEGER, comm_rank + 1, PG_MPI_TAG_SUM, MPI_COMM_WORLD);
-    }
-}
-
 int main(int argc, char** argv)
 {
     MPI_Init(&argc, &argv);
@@ -92,34 +61,26 @@ int main(int argc, char** argv)
 
     if (color == PG_MPI_COLOR_PARALLEL)
     {
-        for (int i = 1; i <= highest_two_power_in_comm_size; ++i)
+        for (int jump_size = 1; jump_size <= highest_two_power_in_comm_size_actual_number / 2; jump_size *= 2)
         {
-            int segment_size =  1 << i;
-            int segment_position = comm_rank % segment_size;
-            int segment_start = comm_rank - segment_position;
+            int send_to = comm_rank + jump_size;
+            int receive_from = comm_rank - jump_size;
 
-
-            int segment_sendercomm_rank = segment_start + segment_size / 2 - 1;
-            int segment_receivercomm_rank = segment_start + segment_size - 1;
-
-            if (comm_rank == segment_sendercomm_rank)
+            if (send_to < highest_two_power_in_comm_size_actual_number)
             {
-                MPI_Send(&prefix_sum, 1, MPI_INTEGER, segment_receivercomm_rank, PG_MPI_TAG_SUM, new_comm);
+                MPI_Send(&prefix_sum, 1, MPI_INTEGER, send_to, PG_MPI_TAG_SUM, new_comm);
             }
-            else if (comm_rank == segment_receivercomm_rank)
+            if (receive_from >= 0)
             {
                 int result = 0;
-                MPI_Recv(&result, 1, MPI_INTEGER, segment_sendercomm_rank, PG_MPI_TAG_SUM, new_comm, MPI_STATUS_IGNORE);
+                MPI_Recv(&result, 1, MPI_INTEGER, receive_from, PG_MPI_TAG_SUM, new_comm, MPI_STATUS_IGNORE);
                 prefix_sum += result;
-            }
-
-            if (comm_rank == segment_size - 1)
-            {
-                printf("rank=%d x=%d prefix=%d\n", comm_rank, comm_rank, prefix_sum);
             }
 
             MPI_Barrier(new_comm);
         }
+
+        printf("rank=%d x=%d prefix=%d\n", comm_rank, comm_rank, prefix_sum);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
