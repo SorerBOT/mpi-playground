@@ -287,6 +287,19 @@ int main(int argc, char** argv)
 #endif
     }
 
+
+
+    if (comm_rank == PG_MM_LEADER_RANK)
+    {
+        free(recvbuf);
+        free(recvcounts);
+        free(displs);
+    }
+
+    free(A.data);
+    free(B.data);
+    free(C.data);
+
     MPI_Finalize();
     return 0;
 }
